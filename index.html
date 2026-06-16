@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faanz Order Bio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        utama: '#10539F',
+                        balas: '#22c55e',
+                        abu: '#f3f4f6'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gradient-to-br from-gray-100 to-gray-200 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md border-t-4 border-utama">
+        <div class="flex justify-center mb-4">
+            <div class="w-16 h-16 bg-utama/15 rounded-full flex items-center justify-center">
+                <span class="text-utama text-3xl font-bold">FS</span>
+            </div>
+        </div>
+
+        <h2 class="text-center text-2xl font-bold text-gray-800 mb-2">FAANZ ORDER BIO</h2>
+        <p class="text-center text-gray-600 mb-5">Silakan tulis pesan kamu di sini ✨</p>
+
+        <!-- Area Tampilan Pesan -->
+        <div id="areaPesan" class="bg-abu rounded-lg p-4 h-72 overflow-y-auto mb-5 text-sm space-y-4">
+            <div class="text-gray-500 italic text-center">Belum ada pesan masuk</div>
+        </div>
+
+        <!-- Form Kirim Pengirim -->
+        <form id="formKirim" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nama Pengirim</label>
+                <input type="text" id="nama" placeholder="Contoh: Budi / 0812xxxx" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-utama/40" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Pesan Kamu</label>
+                <textarea id="pesan" rows="3" placeholder="Tulis pesan di sini..." class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-utama/40 resize-none" required></textarea>
+            </div>
+            <button type="submit" id="tombolKirim" class="w-full bg-utama hover:bg-utama/90 text-white font-bold py-3 rounded-lg shadow">
+                🚀 KIRIM PESAN
+            </button>
+            <div id="status" class="text-center mt-2 font-medium hidden"></div>
+        </form>
+
+        <p class="text-center text-xs text-gray-500 mt-5">© 2026 Faanz Store</p>
+    </div>
+
+    <script>
+        const TOKEN_BOT = "8833638608:AAEeWjZ2AMud78LXXKNuzrsn6kUXhsyXQps";
+        const ID_PEMILIK = "8597220780";
+        const API = `https://api.telegram.org/bot${TOKEN_BOT}`;
+        let offset = 0;
+
+        const area = document.getElementById("areaPesan");
+        const form = document.getElementById("formKirim");
+        const status = document.getElementById("status");
+
+        // --- Kirim pesan pengirim ke Telegram ---
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            status.classList.add("hidden");
+            const nama = document.getElementById("nama").value.trim();
+            const teks = document.getElementById("pesan").value.trim();
+
+            // Tampilkan pesan pengirim di atas
+            tampilPesanPengirim(nama, teks);
+
+            // Kirim ke Telegram kamu
+            const isiKirim = `📩 PESAN BARU\n\n👤 Nama: ${nama}\n💬 Pesan: ${teks}\n\nBalas pakai: /kirimpesan tulisanmu`;
+            try {
+                await fetch(`${API}/sendMessage?chat_id=${ID_PEMILIK}&text=${encodeURIComponent(isiKirim)}`);
+                status.textContent = "✅ Pesan terkirim!";
+                status.className = "text-green-600";
+                form.reset();
+            } catch {
+                status.textContent = "❌ Gagal kirim";
+                status.className = "text-red-600";
+            }
+            status.classList.remove("hidden");
+        });
+
+        // --- Cek balasan dari pemilik ---
+        async function cekBalasan() {
+            try {
+                const res = await fetch(`${API}/getUpdates?offset=${offset}&timeout=10`);
+                const data = await res.json();
+                if (!data.ok) return;
+
+                data.result.forEach(upd => {
+                    offset = upd.update_id + 1;
+                    const msg = upd.message;
+                    if (!msg || msg.chat.id != ID_PEMILIK) return;
+
+                    if (msg.text.startsWith("/kirimpesan ")) {
+                        const balasan = msg.text.replace("/kirimpesan ", "").trim();
+                        if (balasan) tampilPesanPemilik(balasan);
+                    }
+                });
+            } catch {}
+        }
+
+        // --- Tampil pesan pengirim ---
+        function tampilPesanPengirim(nama, teks) {
+            const div = document.createElement("div");
+            div.className = "bg-white p-3 rounded-lg border border-gray-200";
+            div.innerHTML = `
+                <p class="font-semibold text-gray-800 mb-1">👤 ${nama}</p>
+                <p class="text-gray-700">${teks}</p>
+            `;
+            area.appendChild(div);
+            area.scrollTop = area.scrollHeight;
+        }
+
+        // --- Tampil pesan pemilik DI BAWAH pesan pengirim ---
+        function tampilPesanPemilik(teks) {
+            const div = document.createElement("div");
+            div.className = "bg-green-50 p-3 rounded-lg border border-balas/30 ml-4";
+            div.innerHTML = `
+                <p class="font-semibold text-balas mb-1">💬 Pesan dari Pemilik</p>
+                <p class="text-gray-800">${teks}</p>
+            `;
+            area.appendChild(div);
+            area.scrollTop = area.scrollHeight;
+        }
+
+        // Jalankan pengecekan balasan setiap 3 detik
+        setInterval(cekBalasan, 3000);
+    </script>
+</body>
+</html>
